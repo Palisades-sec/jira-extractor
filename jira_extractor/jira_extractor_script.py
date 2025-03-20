@@ -619,12 +619,6 @@ def main():
 
     args = parser.parse_args()
 
-    print("jira_url", args.url)
-    print("jira_username", args.username)
-    print("jira_api_token", args.api_token)
-    print("jira_jql", args.jql)
-    print("jira_max_results", args.max_results)
-
     try:
         # Create extractor
         extractor = JiraTicketExtractor(args.url, args.username, args.api_token)
