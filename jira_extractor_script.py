@@ -11,7 +11,7 @@ import base64
 from datetime import datetime
 import re
 import argparse
-from PyPDF2 import PdfWriter
+from PyPDF2 import PdfWriter, PdfReader
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from io import BytesIO
@@ -20,7 +20,7 @@ from io import BytesIO
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("jira_extractor.log"), logging.StreamHandler()],
+    handlers=[logging.StreamHandler()],  # Remove FileHandler, only log to console
 )
 logger = logging.getLogger(__name__)
 
@@ -222,13 +222,14 @@ class JiraTicketExtractor:
                         break
 
         can.save()
-
-        # Move to the beginning of the StringIO buffer
         packet.seek(0)
 
         # Create a new PDF with Reportlab's content
         new_pdf = PdfWriter()
-        new_pdf.add_page()
+        # Create a PDF reader from the packet
+        pdf_reader = PdfReader(packet)
+        # Add the first page from the reader
+        new_pdf.add_page(pdf_reader.pages[0])
 
         # Write the content to the PDF
         with open(pdf_path, "wb") as f:
@@ -251,8 +252,8 @@ class JiraTicketExtractor:
         for attachment in issue.fields.attachment:
             logger.info(f"Downloading attachment: {attachment.filename}")
 
-            # Get attachment content
-            attachment_data = self.jira.attachment(attachment.id)
+            # Get attachment content using the get() method to get the actual bytes
+            attachment_data = attachment.get()
 
             # Save attachment
             attachment_path = os.path.join(attachments_dir, attachment.filename)
@@ -331,7 +332,7 @@ class JiraTicketExtractor:
         # Handle different types of links
         if "docs.google.com" in domain or "drive.google.com" in domain:
             self.process_google_link(url, links_dir, prefix)
-        elif "confluence" in domain:
+        elif "wiki" in domain:
             self.process_confluence_link(url, links_dir, prefix)
         else:
             self.process_generic_link(url, links_dir, prefix)
@@ -509,7 +510,10 @@ class JiraTicketExtractor:
 
             # Create a new PDF
             new_pdf = PdfWriter()
-            new_pdf.add_page()
+            # Create a PDF reader from the packet
+            pdf_reader = PdfReader(packet)
+            # Add the first page from the reader
+            new_pdf.add_page(pdf_reader.pages[0])
 
             # Write the content to the PDF
             with open(output_path, "wb") as f:
@@ -521,20 +525,31 @@ class JiraTicketExtractor:
             logger.error(f"Failed to convert HTML to PDF: {e}")
 
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract Jira tickets and their attachments/links"
     )
     parser.add_argument(
         "--url",
-        required=True,
+        default=os.getenv("JIRA_URL"),
         help="Jira URL (e.g., https://your-domain.atlassian.net)",
     )
-    parser.add_argument("--username", help="Jira username (email)")
-    parser.add_argument("--api-token", help="Jira API token")
+    parser.add_argument(
+        "--username", default=os.getenv("JIRA_USERNAME"), help="Jira username (email)"
+    )
+    parser.add_argument(
+        "--api-token", default=os.getenv("JIRA_API_TOKEN"), help="Jira API token"
+    )
     parser.add_argument(
         "--jql",
-        required=True,
+        default=os.getenv("JIRA_JQL"),
         help='JQL query to select tickets (e.g., "project = PROJ AND created >= -30d")',
     )
     parser.add_argument(
@@ -546,16 +561,25 @@ def main():
 
     args = parser.parse_args()
 
+    print("jira_url", args.url)
+    print("jira_username", args.username)
+    print("jira_api_token", args.api_token)
+    print("jira_jql", args.jql)
+    print("jira_max_results", args.max_results)
+
     try:
         # Create extractor
         extractor = JiraTicketExtractor(args.url, args.username, args.api_token)
 
-        # Extract tickets
+        # Use the JQL query from arguments instead of hardcoding it
         extractor.extract_tickets(args.jql, args.max_results)
 
         logger.info("Ticket extraction completed successfully")
 
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         logger.error(f"Extraction failed: {str(e)}")
         print(f"Error: {str(e)}")
         return 1

@@ -6,5 +6,19 @@ dist/
 wheels/
 *.egg-info
 
+
 # Virtual environments
 .venv
+
+# Ignore all files in the credentials directory
+credentials/*
+.env
+
+
+# Ignore all files in the credentials directory
+credentials/*
+
+jira_tickets/*
+
+
+-30d
