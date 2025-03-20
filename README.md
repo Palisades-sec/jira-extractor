@@ -10,7 +10,7 @@ A Python-based tool for extracting Jira tickets and their attachments, with supp
 - Download ticket attachments
 - Extract and process links from ticket descriptions and comments
 - Support for different link types (Confluence, Google Docs, generic web links)
-- Cross-platform support (Windows, Linux, macOS)
+- Intelligent link content extraction with proper naming
 
 ## Prerequisites
 
@@ -46,22 +46,16 @@ A Python-based tool for extracting Jira tickets and their attachments, with supp
 
 ## Usage
 
-### Using Command Line
+The script can be run directly using Python:
+
+```bash
+python jira_extractor_script.py
+```
+
+The script will automatically read configuration from your .env file. You can also override settings using command line arguments:
 
 ```bash
 python jira_extractor_script.py --url "YOUR_JIRA_URL" --username "YOUR_USERNAME" --api-token "YOUR_API_TOKEN" --jql "YOUR_JQL_QUERY"
-```
-
-### Using Batch File (Windows)
-
-```bash
-run_jira_extractor.bat
-```
-
-### Using Makefile (Linux/macOS)
-
-```bash
-make run
 ```
 
 ## Command Line Arguments
@@ -82,12 +76,37 @@ jira_tickets/
 │   ├── attachments/           # Ticket attachments
 │   │   └── attachment_files
 │   └── links/                 # Extracted links
-│       ├── confluence_pages
-│       ├── google_docs
-│       └── web_pages
-└── TICKET-124/
-    └── ...
+│       ├── Project_Requirements.html      # Confluence page with actual title
+│       ├── Project_Requirements.txt
+│       ├── Project_Requirements.pdf
+│       ├── google_doc_Specification.json  # Google doc link info
+│       └── generic_webpage.html          # Generic web links
 ```
+
+## Link Processing
+
+The script processes different types of links found in tickets:
+
+### Confluence Pages
+
+- Files are named using the actual page title from Confluence
+- Example: A page titled "Project Requirements" creates:
+  - `Project_Requirements.html`
+  - `Project_Requirements.txt`
+  - `Project_Requirements.pdf`
+
+### Google Docs
+
+- Stored as JSON files with link information
+- Files named with document title when available
+- Example: `google_doc_DocumentName.json`
+
+### Generic Web Links
+
+- Named based on content type and URL components
+- HTML pages saved with appropriate extensions
+- PDFs and other files maintain their format
+- Example: `webpage_title.html`, `document.pdf`
 
 ## Performance Features
 
@@ -111,8 +130,6 @@ jira_tickets/
 ```
 .
 ├── jira_extractor_script.py  # Main script
-├── run_jira_extractor.bat    # Windows batch file
-├── Makefile                  # Linux/macOS make file
 ├── .env                      # Configuration file
 ├── pyproject.toml           # Python dependencies
 └── README.md                # Documentation
