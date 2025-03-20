@@ -15,6 +15,8 @@ from PyPDF2 import PdfWriter, PdfReader
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from io import BytesIO
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import math
 
 # Setup logging
 logging.basicConfig(
@@ -63,11 +65,11 @@ class JiraTicketExtractor:
 
     def extract_tickets(self, jql_query, max_results=50):
         """
-        Extract tickets based on JQL query
+        Extract tickets based on JQL query using parallel processing
 
         Args:
             jql_query (str): JQL query to find tickets
-            max_results (int): Maximum number of tickets to retrieve
+            max_results (int): Maximum number of tickets to retrieve per batch
         """
         logger.info(f"Extracting tickets using query: {jql_query}")
 
@@ -75,13 +77,69 @@ class JiraTicketExtractor:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-        # Fetch issues based on JQL query
-        issues = self.jira.search_issues(jql_query, maxResults=max_results)
-        logger.info(f"Found {len(issues)} tickets")
+        # First, get total number of issues
+        total_issues = self.jira.search_issues(jql_query, maxResults=0).total
+        logger.info(f"Found total of {total_issues} tickets")
 
-        # Process each issue
+        if total_issues == 0:
+            logger.info("No tickets found matching the query")
+            return
+
+        # Calculate number of batches needed
+        batch_size = min(max_results, 100)  # Limit batch size to 100
+        num_batches = math.ceil(total_issues / batch_size)
+
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=min(num_batches, 5)) as executor:
+            future_to_batch = {}
+
+            # Submit batch processing tasks
+            for batch_num in range(num_batches):
+                start_at = batch_num * batch_size
+                future = executor.submit(
+                    self._process_batch, jql_query, start_at, batch_size
+                )
+                future_to_batch[future] = batch_num
+
+            # Process completed batches
+            for future in as_completed(future_to_batch):
+                batch_num = future_to_batch[future]
+                try:
+                    num_processed = future.result()
+                    logger.info(
+                        f"Completed batch {batch_num + 1}/{num_batches} "
+                        f"(processed {num_processed} tickets)"
+                    )
+                except Exception as e:
+                    logger.error(f"Batch {batch_num + 1} failed: {str(e)}")
+
+        logger.info(f"Completed processing all {total_issues} tickets")
+
+    def _process_batch(self, jql_query, start_at, batch_size):
+        """
+        Process a batch of tickets
+
+        Args:
+            jql_query (str): JQL query
+            start_at (int): Starting index
+            batch_size (int): Number of tickets to process in this batch
+
+        Returns:
+            int: Number of tickets processed in this batch
+        """
+        issues = self.jira.search_issues(
+            jql_query, startAt=start_at, maxResults=batch_size
+        )
+
+        processed = 0
         for issue in issues:
-            self.process_ticket(issue)
+            try:
+                self.process_ticket(issue)
+                processed += 1
+            except Exception as e:
+                logger.error(f"Failed to process ticket {issue.key}: {str(e)}")
+
+        return processed
 
     def process_ticket(self, issue):
         """
