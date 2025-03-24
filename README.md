@@ -1,127 +1,90 @@
 # Jira Ticket Extractor
 
-A Python-based tool for extracting Jira tickets and their attachments, with support for parallel processing and multiple output formats (JSON, PDF).
+A Python tool to extract Jira tickets, including attachments and linked content, with proper error handling and parallel processing.
 
 ## Features
 
-- Extract Jira tickets using JQL queries
-- Parallel processing of tickets in batches
-- Export ticket information to JSON and PDF formats
+- Extract Jira tickets based on JQL queries
 - Download ticket attachments
-- Extract and process links from ticket descriptions and comments
-- Support for different link types (Confluence, Google Docs, generic web links)
-- Intelligent link content extraction with proper naming
+- Process linked content (Confluence, Google Docs, etc.)
+- Generate PDF versions of tickets
+- Parallel processing for better performance
+- Comprehensive error handling and logging
 
-## Prerequisites
-
-- Python 3.12 or higher
-- Jira account with API access
-- Required Python packages (installed via pyproject.toml):
-  - jira==3.8.0
-  - requests==2.28.1
-  - html2text
-  - PyPDF2
-  - reportlab
-  - python-dotenv==1.0.1
-  - pydantic==2.4.2
-  - pydantic-settings==2.0.2
-
-## Setup
+## Installation
 
 1. Clone the repository:
 
-   ```bash
-   git clone <repository-url>
-   cd jira-script
-   ```
+```bash
+git clone <repository-url>
+cd jira-ticket-extractor
+```
 
-2. Create a `.env` file in the project root with your Jira credentials:
-   ```env
-   JIRA_URL=https://your-domain.atlassian.net/
-   JIRA_USERNAME=your.email@domain.com
-   JIRA_API_TOKEN=your-jira-api-token
-   JIRA_PROJECT_KEY=YOUR-PROJECT
-   JIRA_JQL=project = "YOUR-PROJECT" AND created >= -30d
-   ```
+2. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+3. Create a `.env` file with your Jira credentials:
+
+```bash
+JIRA_URL=https://your-domain.atlassian.net
+JIRA_USERNAME=your-email@domain.com
+JIRA_API_TOKEN=your-api-token
+JIRA_JQL="project = PROJ AND created >= -30d"
+```
 
 ## Usage
 
-The script can be run directly using Python:
+Run the script with command line arguments:
 
 ```bash
-python jira_extractor_script.py
+python -m jira_extractor.main --url https://your-domain.atlassian.net --jql "project = PROJ"
 ```
 
-The script will automatically read configuration from your .env file. You can also override settings using command line arguments:
+Or use environment variables from `.env` file:
 
 ```bash
-python jira_extractor_script.py --url "YOUR_JIRA_URL" --username "YOUR_USERNAME" --api-token "YOUR_API_TOKEN" --jql "YOUR_JQL_QUERY"
+python -m jira_extractor.main
 ```
 
-## Command Line Arguments
+### Command Line Arguments
 
-- `--url`: Jira instance URL
+- `--url`: Jira URL (e.g., https://your-domain.atlassian.net)
 - `--username`: Jira username (email)
 - `--api-token`: Jira API token
 - `--jql`: JQL query to select tickets
-- `--max-results`: Maximum number of tickets to process per batch (default: 50)
+- `--max-results`: Maximum number of tickets to process (default: 50)
 
-## Output Structure
+## Output
+
+The script creates a `jira_tickets` directory with the following structure for each ticket:
 
 ```
 jira_tickets/
-├── TICKET-123/
-│   ├── TICKET-123_info.json    # Ticket metadata
-│   ├── TICKET-123.pdf         # PDF version of ticket
-│   ├── attachments/           # Ticket attachments
-│   │   └── attachment_files
-│   └── links/                 # Extracted links
-│       ├── Project_Requirements.html      # Confluence page with actual title
-│       ├── Project_Requirements.txt
-│       ├── Project_Requirements.pdf
-│       ├── google_doc_Specification.json  # Google doc link info
-│       └── generic_webpage.html          # Generic web links
+└── TICKET-123/
+    ├── TICKET-123_info.json    # Ticket information
+    ├── TICKET-123.pdf          # PDF version of the ticket
+    ├── attachments/            # Ticket attachments
+    └── links/                  # Processed linked content
 ```
-
-## Link Processing
-
-The script processes different types of links found in tickets:
-
-### Confluence Pages
-
-- Files are named using the actual page title from Confluence
-- Example: A page titled "Project Requirements" creates:
-  - `Project_Requirements.html`
-  - `Project_Requirements.txt`
-  - `Project_Requirements.pdf`
-
-### Google Docs
-
-- Stored as JSON files with link information
-- Files named with document title when available
-- Example: `google_doc_DocumentName.json`
-
-### Generic Web Links
-
-- Named based on content type and URL components
-- HTML pages saved with appropriate extensions
-- PDFs and other files maintain their format
-- Example: `webpage_title.html`, `document.pdf`
-
-## Performance Features
-
-- Parallel processing using ThreadPoolExecutor
-- Configurable batch size (default: min(max_results, 100))
-- Maximum 5 concurrent batch processes
-- Progress tracking and logging
-- Efficient handling of large ticket volumes
 
 ## Error Handling
 
-- Comprehensive error logging
-- Graceful handling of failed tickets/batches
-- Continues processing despite individual ticket failures
-- Detailed error information in logs
+- All operations include proper error handling
+- Failed operations are logged with detailed error messages
+- The script continues processing other tickets if one fails
+- A summary of failed operations is provided at the end
+
+## Logging
+
+- Detailed logs are written to console
+- Includes information about:
+  - Ticket processing status
+  - Download progress
+  - Error messages
+  - Operation completion status
 
 ## Development
 
