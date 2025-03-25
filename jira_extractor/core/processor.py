@@ -158,7 +158,7 @@ class TicketProcessor:
             return False
 
     def _extract_comments(self, issue, ticket_dir):
-        """Extract comments from the ticket"""
+        """Extract comments, their attachments and links from the ticket"""
         try:
             comments_dir = os.path.join(ticket_dir, "comments")
             if not FileUtils.ensure_directory(comments_dir):
@@ -170,40 +170,87 @@ class TicketProcessor:
             # Save comments as JSON
             comments_data = []
             for comment in comments:
+                # Create a directory for each comment
+                comment_dir = os.path.join(comments_dir, f"comment_{comment.id}")
+                if not FileUtils.ensure_directory(comment_dir):
+                    continue
+                
+                # Extract comment attachments if any
+                attachments_info = []
+                if hasattr(comment, 'attachment') and comment.attachment:
+                    attachments_dir = os.path.join(comment_dir, "attachments")
+                    if FileUtils.ensure_directory(attachments_dir):
+                        for attachment in comment.attachment:
+                            try:
+                                logger.info(f"Downloading comment {comment.id} attachment: {attachment.filename}")
+                                attachment_data = attachment.get()
+                                
+                                if FileUtils.save_file(
+                                    os.path.join(attachments_dir, attachment.filename),
+                                    attachment_data,
+                                    mode='wb'
+                                ):
+                                    attachments_info.append({
+                                        "filename": attachment.filename,
+                                        "size": attachment.size,
+                                        "created": attachment.created
+                                    })
+                            except Exception as e:
+                                logger.error(f"Failed to download comment attachment {attachment.filename}: {str(e)}")
+                
+                # Extract links from comment body if any
+                links = []
+                links_dir = os.path.join(comment_dir, "links")
+                if FileUtils.ensure_directory(links_dir):
+                    # Simple URL pattern matching - you might want to use a more robust method
+                    import re
+                    urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', comment.body)
+                    for idx, url in enumerate(urls):
+                        try:
+                            if self.link_handler.process_link(url, links_dir, f"comment_{comment.id}_link_{idx}"):
+                                links.append(url)
+                        except Exception as e:
+                            logger.error(f"Failed to process link in comment {comment.id}: {str(e)}")
+                
+                # Build comment info
                 comment_info = {
                     "id": comment.id,
                     "author": getattr(comment.author, "displayName", "Unknown"),
                     "created": comment.created,
                     "updated": comment.updated,
                     "body": comment.body,
-                    "visibility": getattr(comment.visibility, "value", "None") if hasattr(comment, "visibility") else "None"
+                    "visibility": getattr(comment.visibility, "value", "None") if hasattr(comment, "visibility") else "None",
+                    "attachments": attachments_info,
+                    "links": links
                 }
                 comments_data.append(comment_info)
+                
+                # Save individual comment info
+                comment_text = f"""Comment ID: {comment.id}
+Author: {comment_info['author']}
+Created: {comment_info['created']}
+Updated: {comment_info['updated']}
+Visibility: {comment_info['visibility']}
+
+Content:
+{comment.body}
+
+Attachments: {len(attachments_info)}
+Links: {len(links)}
+"""
+                FileUtils.save_file(
+                    os.path.join(comment_dir, "comment_info.txt"),
+                    comment_text
+                )
             
-            # Save all comments in a single JSON file
+            # Save all comments metadata in a single JSON file
             if not FileUtils.save_file(
                 os.path.join(comments_dir, "comments.json"),
                 json.dumps(comments_data, indent=4)
             ):
                 logger.warning(f"Failed to save comments JSON for {issue.key}")
             
-            # Save each comment as a separate text file
-            for comment in comments_data:
-                comment_text = f"""Comment ID: {comment['id']}
-Author: {comment['author']}
-Created: {comment['created']}
-Updated: {comment['updated']}
-Visibility: {comment['visibility']}
-
-{comment['body']}
-"""
-                if not FileUtils.save_file(
-                    os.path.join(comments_dir, f"comment_{comment['id']}.txt"),
-                    comment_text
-                ):
-                    logger.warning(f"Failed to save comment {comment['id']} as text file")
-            
-            logger.info(f"Extracted {len(comments_data)} comments for ticket {issue.key}")
+            logger.info(f"Extracted {len(comments_data)} comments with their attachments and links for ticket {issue.key}")
             return True
             
         except Exception as e:
