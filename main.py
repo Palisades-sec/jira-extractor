@@ -28,7 +28,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--jql",
-        default=os.getenv("JIRA_JQL"),
+        required=True,
         help='JQL query to select tickets (e.g., "project = PROJ AND created >= -30d")',
     )
     parser.add_argument(

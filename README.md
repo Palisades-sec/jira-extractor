@@ -1,6 +1,92 @@
 # Jira Ticket Extractor
 
-A Python tool to extract Jira tickets, including attachments and linked content, with proper error handling and parallel processing.
+A Python script to extract Jira tickets and their attachments/links based on JQL queries.
+
+## Prerequisites
+
+- Python 3.x
+- Virtual environment (recommended)
+- Jira API token (can be generated from your Atlassian account)
+
+## Setup
+
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd jira_script
+```
+
+2. Create and activate a virtual environment:
+
+```bash
+# Windows
+python -m venv .venv
+.venv\Scripts\activate
+
+# Linux/Mac
+python -m venv .venv
+source .venv/bin/activate
+```
+
+3. Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Configure environment variables:
+   Create a `.env` file in the root directory with the following content:
+
+```env
+JIRA_URL=https://your-domain.atlassian.net/
+JIRA_USERNAME=your-email@domain.com
+JIRA_API_TOKEN=your-api-token
+JIRA_PROJECT_KEY=YOUR_PROJECT
+JIRA_JQL=project = "YOUR_PROJECT" AND created >= -30d
+```
+
+## Usage
+
+The script can be run using the following command:
+
+```bash
+python -m main --jql "your-jql-query"
+```
+
+### Command Line Arguments
+
+| Argument        | Required | Description                                  | Example                               |
+| --------------- | -------- | -------------------------------------------- | ------------------------------------- |
+| `--jql`         | Yes      | JQL query to select tickets                  | `"project = KAN AND created >= -30d"` |
+| `--url`         | No       | Jira URL (defaults to .env value)            | `https://your-domain.atlassian.net`   |
+| `--username`    | No       | Jira username/email (defaults to .env value) | `your-email@domain.com`               |
+| `--api-token`   | No       | Jira API token (defaults to .env value)      | `your-api-token`                      |
+| `--max-results` | No       | Maximum number of tickets to process         | `100`                                 |
+
+### Examples
+
+1. Basic usage with JQL query:
+
+```bash
+python -m main --jql "project = KAN AND created >= -30d"
+```
+
+2. Specify maximum results:
+
+```bash
+python -m main --jql "project = KAN AND created >= -30d" --max-results 50
+```
+
+3. Override environment variables:
+
+```bash
+python -m main --jql "project = KAN AND created >= -30d" --url "https://custom-domain.atlassian.net" --username "different@email.com" --api-token "your-token"
+```
+
+### Common JQL Query Examples
+
+1. Tickets created in the last 30 days:
 
 ## Features
 
@@ -10,52 +96,6 @@ A Python tool to extract Jira tickets, including attachments and linked content,
 - Generate PDF versions of tickets
 - Parallel processing for better performance
 - Comprehensive error handling and logging
-
-## Installation
-
-1. Clone the repository:
-
-```bash
-git clone <repository-url>
-cd jira-ticket-extractor
-```
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Create a `.env` file with your Jira credentials:
-
-```bash
-JIRA_URL=https://your-domain.atlassian.net
-JIRA_USERNAME=your-email@domain.com
-JIRA_API_TOKEN=your-api-token
-JIRA_JQL="project = PROJ AND created >= -30d"
-```
-
-## Usage
-
-Run the script with command line arguments:
-
-```bash
-python -m jira_extractor.main --url https://your-domain.atlassian.net --jql "project = PROJ"
-```
-
-Or use environment variables from `.env` file:
-
-```bash
-python -m jira_extractor.main
-```
-
-### Command Line Arguments
-
-- `--url`: Jira URL (e.g., https://your-domain.atlassian.net)
-- `--username`: Jira username (email)
-- `--api-token`: Jira API token
-- `--jql`: JQL query to select tickets
-- `--max-results`: Maximum number of tickets to process (default: 50)
 
 ## Output
 

@@ -51,6 +51,10 @@ class TicketProcessor:
             if not self._extract_attachments(issue, ticket_dir):
                 return False
             
+            # Extract comments
+            if not self._extract_comments(issue, ticket_dir):
+                return False
+            
             # Extract links
             if not self._extract_links(issue, ticket_dir):
                 return False
@@ -151,6 +155,59 @@ class TicketProcessor:
             
         except Exception as e:
             logger.error(f"Failed to process attachments for {issue.key}: {str(e)}")
+            return False
+
+    def _extract_comments(self, issue, ticket_dir):
+        """Extract comments from the ticket"""
+        try:
+            comments_dir = os.path.join(ticket_dir, "comments")
+            if not FileUtils.ensure_directory(comments_dir):
+                return False
+            
+            # Get all comments
+            comments = self.jira.comments(issue)
+            
+            # Save comments as JSON
+            comments_data = []
+            for comment in comments:
+                comment_info = {
+                    "id": comment.id,
+                    "author": getattr(comment.author, "displayName", "Unknown"),
+                    "created": comment.created,
+                    "updated": comment.updated,
+                    "body": comment.body,
+                    "visibility": getattr(comment.visibility, "value", "None") if hasattr(comment, "visibility") else "None"
+                }
+                comments_data.append(comment_info)
+            
+            # Save all comments in a single JSON file
+            if not FileUtils.save_file(
+                os.path.join(comments_dir, "comments.json"),
+                json.dumps(comments_data, indent=4)
+            ):
+                logger.warning(f"Failed to save comments JSON for {issue.key}")
+            
+            # Save each comment as a separate text file
+            for comment in comments_data:
+                comment_text = f"""Comment ID: {comment['id']}
+Author: {comment['author']}
+Created: {comment['created']}
+Updated: {comment['updated']}
+Visibility: {comment['visibility']}
+
+{comment['body']}
+"""
+                if not FileUtils.save_file(
+                    os.path.join(comments_dir, f"comment_{comment['id']}.txt"),
+                    comment_text
+                ):
+                    logger.warning(f"Failed to save comment {comment['id']} as text file")
+            
+            logger.info(f"Extracted {len(comments_data)} comments for ticket {issue.key}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to extract comments for {issue.key}: {str(e)}")
             return False
 
     def _extract_links(self, issue, ticket_dir):
