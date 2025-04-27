@@ -175,6 +175,7 @@ class LinkHandler:
             
             # Create links directory for nested links
             nested_links_dir = os.path.join(ticket_dir, "links")
+            attachments_dir = os.path.join(ticket_dir, "attachments")
             if not FileUtils.ensure_directory(nested_links_dir):
                 return False
             
@@ -232,6 +233,9 @@ class LinkHandler:
                     urls_set = set(urls)
                     for idx, url in enumerate(urls_set):
                         self.process_link(url, nested_links_dir, f"comment_{comment.id}_link_{idx}")
+
+            # Extract attachments
+            self._extract_attachments(issue, attachments_dir)
             
             return json_saved and pdf_saved
             
@@ -242,6 +246,34 @@ class LinkHandler:
                 f"{links_dir}/{prefix}_jira_link.json",
                 json.dumps(link_info, indent=4)
             )
+    def _extract_attachments(self, issue, ticket_dir):
+        """Extract attachments from the ticket"""
+        try:
+            attachments_dir = ticket_dir
+            if not FileUtils.ensure_directory(attachments_dir):
+                return False
+            
+            for attachment in issue.fields.attachment:
+                try:
+                    logger.info(f"Downloading attachment: {attachment.filename}")
+                    attachment_data = attachment.get()
+                    
+                    if not FileUtils.save_file(
+                        os.path.join(attachments_dir, attachment.filename),
+                        attachment_data,
+                        mode='wb'
+                    ):
+                        logger.warning(f"Failed to save attachment: {attachment.filename}")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to download attachment {attachment.filename}: {str(e)}")
+                    continue
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to process attachments for {issue.key}: {str(e)}")
+            return False
 
     def process_generic_link(self, url, links_dir, prefix):
         """
