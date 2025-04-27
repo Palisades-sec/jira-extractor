@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import traceback
 import sys
 import argparse
 from dotenv import load_dotenv
@@ -39,7 +40,6 @@ def parse_arguments():
     )
     
     return parser.parse_args()
-
 def main():
     """Main entry point of the script"""
     try:
@@ -70,6 +70,7 @@ def main():
         return 1
     except Exception as e:
         logger.error(f"Extraction failed: {str(e)}")
+        logger.error(traceback.format_exc())
         return 1
 
 if __name__ == "__main__":

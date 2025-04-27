@@ -5,6 +5,12 @@ import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..config.logger import logger
 from .processor import TicketProcessor
+from pydantic import BaseModel
+
+class JiraConfig(BaseModel):
+    jira_url: str
+    username: str
+    api_token: str
 
 class JiraTicketExtractor:
     def __init__(self, jira_url, username=None, api_token=None):
@@ -40,9 +46,15 @@ class JiraTicketExtractor:
             # Initialize session for requests
             self.session = requests.Session()
             self.session.auth = (username, api_token)
+
+            self.jira_config = JiraConfig(
+                jira_url=jira_url,
+                username=username,
+                api_token=api_token
+            )
             
             # Initialize ticket processor
-            self.processor = TicketProcessor(self.jira, self.session)
+            # self.processor = TicketProcessor(self.jira, self.session, project_key = None, jira_config = self.jira_config)
             
         except Exception as e:
             logger.error(f"Failed to initialize Jira extractor: {str(e)}")
@@ -139,11 +151,15 @@ class JiraTicketExtractor:
                 startAt=start_at,
                 maxResults=batch_size
             )
-            
+            # get the project key from the first issue
+            project_key = issues[0].fields.project.key
+            logger.info(f"Project key: {project_key}")
+
+            processor_v2 = TicketProcessor(self.jira, self.session, project_key, self.jira_config)
             processed = 0
             for issue in issues:
                 try:
-                    if self.processor.process_ticket(issue):
+                    if processor_v2.process_ticket(issue):
                         processed += 1
                 except Exception as e:
                     logger.error(f"Failed to process ticket {issue.key}: {str(e)}")

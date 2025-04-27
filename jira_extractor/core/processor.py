@@ -7,7 +7,7 @@ from ..utils.link_handlers import LinkHandler
 from .converter import PDFConverter
 
 class TicketProcessor:
-    def __init__(self, jira_client, session):
+    def __init__(self, jira_client, session, project_key = None, jira_config = None):
         """
         Initialize ticket processor
         
@@ -16,11 +16,11 @@ class TicketProcessor:
             session: Authenticated requests session
         """
         self.jira = jira_client
-        self.link_handler = LinkHandler(session)
+        self.link_handler = LinkHandler(session, jira_client, project_key, jira_config)
         self.pdf_converter = PDFConverter()
         self.output_dir = "jira_tickets"
 
-    def process_ticket(self, issue):
+    def process_ticket(self, issue, ticket_dir = None):
         """
         Process a single Jira ticket
         
@@ -35,7 +35,8 @@ class TicketProcessor:
             logger.info(f"Processing ticket: {ticket_key}")
             
             # Create ticket directory
-            ticket_dir = os.path.join(self.output_dir, ticket_key)
+            if not ticket_dir:
+                ticket_dir = os.path.join(self.output_dir, ticket_key)
             if not FileUtils.ensure_directory(ticket_dir):
                 return False
             
@@ -204,9 +205,15 @@ class TicketProcessor:
                 if FileUtils.ensure_directory(links_dir):
                     # Simple URL pattern matching - you might want to use a more robust method
                     import re
-                    urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', comment.body)
-                    for idx, url in enumerate(urls):
+                    urls = urls = re.findall(
+                        r"https?://[^\s\]\|>]+",
+                        comment.body
+                    )
+                    urls_set = set(urls)
+                    logger.info(f"Found urls inside extract_comments: {urls_set} in comment {comment.body}")
+                    for idx, url in enumerate(urls_set):
                         try:
+                            logger.info(f"Processing link {url} in comment {comment.id}")
                             if self.link_handler.process_link(url, links_dir, f"comment_{comment.id}_link_{idx}"):
                                 links.append(url)
                         except Exception as e:
@@ -227,17 +234,17 @@ class TicketProcessor:
                 
                 # Save individual comment info
                 comment_text = f"""Comment ID: {comment.id}
-Author: {comment_info['author']}
-Created: {comment_info['created']}
-Updated: {comment_info['updated']}
-Visibility: {comment_info['visibility']}
+                    Author: {comment_info['author']}
+                    Created: {comment_info['created']}
+                    Updated: {comment_info['updated']}
+                    Visibility: {comment_info['visibility']}
 
-Content:
-{comment.body}
+                    Content:
+                    {comment.body}
 
-Attachments: {len(attachments_info)}
-Links: {len(links)}
-"""
+                    Attachments: {len(attachments_info)}
+                    Links: {len(links)}
+                    """
                 FileUtils.save_file(
                     os.path.join(comment_dir, "comment_info.txt"),
                     comment_text
@@ -277,12 +284,21 @@ Links: {len(links)}
             comments = self.jira.comments(issue)
             for comment in comments:
                 if comment.body:
+                    logger.info(f"Comment body: {comment.body}")
+                    
                     urls = re.findall(
-                        r"https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+[/\w\.-]*(?:\?\S+)?",
+                        r"https?://[^\s\]\|>]+",
                         comment.body
                     )
-                    for url in urls:
-                        self.link_handler.process_link(url, links_dir, f"comment_{comment.id}_link_{urls.index(url)}")
+
+                    logger.info(f"Found urls: {urls} in comment {comment.body}")
+
+                    # make urls set
+                    urls_set = set(urls)
+                    logger.info(f"Urls set: {urls_set}")
+                    
+                    for idx, url in enumerate(urls_set):
+                        self.link_handler.process_link(url, links_dir, f"comment_{comment.id}_link_{idx}")
             
             return True
             
